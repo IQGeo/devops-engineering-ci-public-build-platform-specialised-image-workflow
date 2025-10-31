@@ -1,0 +1,344 @@
+name: Build Specialised Platform Images Workflow
+description: Workflow to build 5 specialised platform images (base, build, appserver, tools, devenv) for Platform 7.x
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Platform version to build (e.g., 7.4.0)'
+        type: string
+        required: true
+      hyphenated_module:
+        description: 'Hyphenated module name for image naming'
+        type: string
+        required: true
+      updated_tags:
+        description: 'Comma-separated list of tags to apply to multi-arch images (e.g., pre-release, latest)'
+        type: string
+      build_id:
+        description: 'Unique build ID per workflow run'
+        type: string
+        required: true
+      engineering_prefix:
+        description: 'Engineering prefix to place multi-arch images in Harbor'
+        type: string
+        default: devops_sandbox_engineering
+      releases_prefix:
+        description: 'Releases prefix to place multi-arch images in Harbor'
+        type: string
+        default: devops_sandbox_releases
+      is_release:
+        description: 'Whether this is a pre-release or release version'
+        type: string
+      dev_tools_version:
+        description: 'Dev tools version for devenv image build'
+        type: string
+    secrets:
+      GH_TOKEN:
+        required: true
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      HARBOR_CLI_SECRET:
+        required: true
+      HARBOR_USERNAME:
+        required: true
+
+run-name: Build Platform ${{ inputs.version }} Specialised Images
+
+jobs:
+  # Step 1: Build platform-base (first in dependency chain)
+  build-base-arm64:
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-base arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: base
+          dockerfile: dockerfile.base
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-base-amd64:
+    runs-on: x64
+    steps:
+      - name: Build and push platform-base amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: base
+          dockerfile: dockerfile.base
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-base-multi-arch:
+    needs: [build-base-arm64, build-base-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-base
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-base
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 2: Build platform-build (depends on platform-base)
+  build-build-arm64:
+    needs: [build-base-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-build arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: build
+          dockerfile: dockerfile.build
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-build-amd64:
+    needs: [build-base-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-build amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: build
+          dockerfile: dockerfile.build
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-build-multi-arch:
+    needs: [build-build-arm64, build-build-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-build
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-build
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 3a: Build platform-appserver (depends on platform-build, runs in parallel with tools)
+  build-appserver-arm64:
+    needs: [build-build-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-appserver arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: appserver
+          dockerfile: dockerfile.appserver
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-appserver-amd64:
+    needs: [build-build-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-appserver amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: appserver
+          dockerfile: dockerfile.appserver
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-appserver-multi-arch:
+    needs: [build-appserver-arm64, build-appserver-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-appserver
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-appserver
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 3b: Build platform-tools (depends on platform-build, runs in parallel with appserver)
+  build-tools-arm64:
+    needs: [build-build-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-tools arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: tools
+          dockerfile: dockerfile.tools
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-tools-amd64:
+    needs: [build-build-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-tools amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: tools
+          dockerfile: dockerfile.tools
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  build-tools-multi-arch:
+    needs: [build-tools-arm64, build-tools-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-tools
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-tools
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 4: Build platform-devenv (depends on platform-appserver)
+  build-devenv-arm64:
+    needs: [build-appserver-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-devenv arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: devenv
+          dockerfile: dockerfile.devenv
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          dev_tools_version: ${{ inputs.dev_tools_version }}
+
+  build-devenv-amd64:
+    needs: [build-appserver-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-devenv amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: devenv
+          dockerfile: dockerfile.devenv
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          dev_tools_version: ${{ inputs.dev_tools_version }}
+
+  build-devenv-multi-arch:
+    needs: [build-devenv-arm64, build-devenv-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-devenv
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-devenv
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
