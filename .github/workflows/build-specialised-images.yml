@@ -49,7 +49,7 @@ run-name: Build Platform ${{ inputs.version }} Specialised Images
 
 jobs:
   # Step 1: Build platform-base (first in dependency chain)
-  build-base-arm64:
+  build-platform-base-arm64:
     runs-on: arm64
     steps:
       - name: Build and push platform-base arm64
@@ -66,7 +66,7 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-base-amd64:
+  build-platform-base-amd64:
     runs-on: x64
     steps:
       - name: Build and push platform-base amd64
@@ -83,8 +83,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-base-multi-arch:
-    needs: [build-base-arm64, build-base-amd64]
+  build-platform-base-multi-arch:
+    needs: [build-platform-base-arm64, build-platform-base-amd64]
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-base
@@ -106,8 +106,8 @@ jobs:
           is_release: ${{ inputs.is_release }}
 
   # Step 2: Build platform-build (depends on platform-base)
-  build-build-arm64:
-    needs: [build-base-multi-arch]
+  build-platform-build-arm64:
+    needs: [build-platform-base-multi-arch]
     runs-on: arm64
     steps:
       - name: Build and push platform-build arm64
@@ -124,8 +124,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-build-amd64:
-    needs: [build-base-multi-arch]
+  build-platform-build-amd64:
+    needs: [build-platform-base-multi-arch]
     runs-on: x64
     steps:
       - name: Build and push platform-build amd64
@@ -142,8 +142,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-build-multi-arch:
-    needs: [build-build-arm64, build-build-amd64]
+  build-platform-build-multi-arch:
+    needs: [build-platform-build-arm64, build-platform-build-amd64]
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-build
@@ -165,8 +165,8 @@ jobs:
           is_release: ${{ inputs.is_release }}
 
   # Step 3a: Build platform-appserver (depends on platform-build, runs in parallel with tools)
-  build-appserver-arm64:
-    needs: [build-build-multi-arch]
+  build-platform-appserver-arm64:
+    needs: [build-platform-build-multi-arch]
     runs-on: arm64
     steps:
       - name: Build and push platform-appserver arm64
@@ -183,8 +183,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-appserver-amd64:
-    needs: [build-build-multi-arch]
+  build-platform-appserver-amd64:
+    needs: [build-platform-build-multi-arch]
     runs-on: x64
     steps:
       - name: Build and push platform-appserver amd64
@@ -201,8 +201,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-appserver-multi-arch:
-    needs: [build-appserver-arm64, build-appserver-amd64]
+  build-platform-appserver-multi-arch:
+    needs: [build-platform-appserver-arm64, build-platform-appserver-amd64]
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-appserver
@@ -224,8 +224,8 @@ jobs:
           is_release: ${{ inputs.is_release }}
 
   # Step 3b: Build platform-tools (depends on platform-build, runs in parallel with appserver)
-  build-tools-arm64:
-    needs: [build-build-multi-arch]
+  build-platform-tools-arm64:
+    needs: [build-platform-build-multi-arch]
     runs-on: arm64
     steps:
       - name: Build and push platform-tools arm64
@@ -242,8 +242,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-tools-amd64:
-    needs: [build-build-multi-arch]
+  build-platform-tools-amd64:
+    needs: [build-platform-build-multi-arch]
     runs-on: x64
     steps:
       - name: Build and push platform-tools amd64
@@ -260,8 +260,8 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           gh_token: ${{ secrets.GH_TOKEN }}
 
-  build-tools-multi-arch:
-    needs: [build-tools-arm64, build-tools-amd64]
+  build-platform-tools-multi-arch:
+    needs: [build-platform-tools-arm64, build-platform-tools-amd64]
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-tools
@@ -283,8 +283,8 @@ jobs:
           is_release: ${{ inputs.is_release }}
 
   # Step 4: Build platform-devenv (depends on platform-appserver)
-  build-devenv-arm64:
-    needs: [build-appserver-multi-arch]
+  build-platform-devenv-arm64:
+    needs: [build-platform-appserver-multi-arch]
     runs-on: arm64
     steps:
       - name: Build and push platform-devenv arm64
@@ -302,8 +302,8 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
           dev_tools_version: ${{ inputs.dev_tools_version }}
 
-  build-devenv-amd64:
-    needs: [build-appserver-multi-arch]
+  build-platform-devenv-amd64:
+    needs: [build-platform-appserver-multi-arch]
     runs-on: x64
     steps:
       - name: Build and push platform-devenv amd64
@@ -321,8 +321,8 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
           dev_tools_version: ${{ inputs.dev_tools_version }}
 
-  build-devenv-multi-arch:
-    needs: [build-devenv-arm64, build-devenv-amd64]
+  build-platform-devenv-multi-arch:
+    needs: [build-platform-devenv-arm64, build-platform-devenv-amd64]
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devenv
