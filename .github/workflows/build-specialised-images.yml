@@ -105,6 +105,65 @@ jobs:
           releases_prefix: ${{ inputs.releases_prefix }}
           is_release: ${{ inputs.is_release }}
 
+  # Step 1b: Build platform-base-clear (runs in parallel with platform-build)
+  build-platform-base-clear-arm64:
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-base-clear arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: base-clear
+          dockerfile: dockerfile.base
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          obfuscate: 'false'
+
+  build-platform-base-clear-amd64:
+    runs-on: x64
+    steps:
+      - name: Build and push platform-base-clear amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: base-clear
+          dockerfile: dockerfile.base
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          obfuscate: 'false'
+
+  build-platform-base-clear-multi-arch:
+    needs: [build-platform-base-clear-arm64, build-platform-base-clear-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-base-clear
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-base-clear
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
   # Step 2: Build platform-build (depends on platform-base)
   build-platform-build-arm64:
     needs: [build-platform-base-multi-arch]
@@ -154,6 +213,69 @@ jobs:
           arm_tag: ${{ inputs.build_id }}_arm-64
           updated_tags: ${{ inputs.updated_tags }}
           module: platform/platform-build
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 2b: Build platform-build-clear (depends on platform-base-clear)
+  build-platform-build-clear-arm64:
+    needs: [build-platform-base-clear-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-build-clear arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: build-clear
+          dockerfile: dockerfile.build
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          obfuscate: 'false'
+          platform_base: 'platform/platform-base-clear'
+
+  build-platform-build-clear-amd64:
+    needs: [build-platform-base-clear-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-build-clear amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: build-clear
+          dockerfile: dockerfile.build
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          obfuscate: 'false'
+          platform_base: 'platform/platform-base-clear'
+
+  build-platform-build-clear-multi-arch:
+    needs: [build-platform-build-clear-arm64, build-platform-build-clear-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-build-clear
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-build-clear
           acr: iqgeoproddev.azurecr.io
           harbor: harbor.delivery.iqgeo.cloud
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -293,7 +415,7 @@ jobs:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
           platform: arm64
-          image_type: devenv
+          image_type: devenv-2
           dockerfile: dockerfile.devenv
           acr: iqgeoproddev.azurecr.io
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -312,7 +434,7 @@ jobs:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
           platform: amd64
-          image_type: devenv
+          image_type: devenv-2
           dockerfile: dockerfile.devenv
           acr: iqgeoproddev.azurecr.io
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -332,7 +454,72 @@ jobs:
           amd_tag: ${{ inputs.build_id }}_amd-64
           arm_tag: ${{ inputs.build_id }}_arm-64
           updated_tags: ${{ inputs.updated_tags }}
-          module: platform/platform-devenv
+          module: platform/platform-devenv-2
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Step 4b: Build platform-devenv-clear (depends on platform-base-clear and platform-build-clear)
+  build-platform-devenv-clear-arm64:
+    needs: [build-platform-base-clear-multi-arch, build-platform-appserver-multi-arch]
+    runs-on: arm64
+    steps:
+      - name: Build and push platform-devenv-clear arm64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: arm64
+          image_type: devenv-2-clear
+          dockerfile: dockerfile.devenv
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          dev_tools_version: ${{ inputs.dev_tools_version }}
+          obfuscate: 'false'
+          platform_base: 'platform/platform-base-clear'
+
+  build-platform-devenv-clear-amd64:
+    needs: [build-platform-base-clear-multi-arch, build-platform-appserver-multi-arch]
+    runs-on: x64
+    steps:
+      - name: Build and push platform-devenv-clear amd64
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: amd64
+          image_type: devenv-2-clear
+          dockerfile: dockerfile.devenv
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+          dev_tools_version: ${{ inputs.dev_tools_version }}
+          obfuscate: 'false'
+          platform_base: 'platform/platform-base-clear'
+
+  build-platform-devenv-clear-multi-arch:
+    needs: [build-platform-devenv-clear-arm64, build-platform-devenv-clear-amd64]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-devenv-clear
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform/platform-devenv-2-clear
           acr: iqgeoproddev.azurecr.io
           harbor: harbor.delivery.iqgeo.cloud
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
