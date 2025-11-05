@@ -1,0 +1,199 @@
+name: Build DevDB QA Images Workflow
+description: Workflow to build DevDB QA deployment images (build, appserver, tools, qa-appserver)
+
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: 'Platform version to build (e.g., 7.4.0)'
+        type: string
+        required: true
+      modules:
+        description: 'Comma-separated list of modules for injector images'
+        type: string
+        required: true
+      updated_tags:
+        description: 'Comma-separated list of tags to apply to multi-arch images (e.g., pre-release, latest)'
+        type: string
+      build_id:
+        description: 'Unique build ID per workflow run'
+        type: string
+        required: true
+      engineering_prefix:
+        description: 'Engineering prefix to place multi-arch images in Harbor'
+        type: string
+        default: devops_sandbox_engineering
+      releases_prefix:
+        description: 'Releases prefix to place multi-arch images in Harbor'
+        type: string
+        default: devops_sandbox_releases
+      is_release:
+        description: 'Whether this is a pre-release or release version'
+        type: string
+    secrets:
+      GH_TOKEN:
+        required: true
+      REGISTRY_USERNAME:
+        required: true
+      REGISTRY_PASSWORD:
+        required: true
+      HARBOR_CLI_SECRET:
+        required: true
+      HARBOR_USERNAME:
+        required: true
+
+run-name: Build DevDB QA Images ${{ inputs.version }}
+
+jobs:
+  # Wave 1: Build platform-devdb-build image (both architectures in parallel)
+  build-devdb-build:
+    strategy:
+      matrix:
+        architecture: [arm64, amd64]
+    runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
+    steps:
+      - name: Build and push platform-devdb-build image
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: ${{ matrix.architecture }}
+          image_type: devdb-build
+          dockerfile: dockerfile.build
+          docker_context: deployment
+          modules: ${{ inputs.modules }}
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  # Create multi-arch manifest for devdb-build
+  create-devdb-build-manifest:
+    needs: build-devdb-build
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-devdb-build
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform-devdb-build
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Wave 2: Build platform-devdb-appserver and platform-devdb-tools (parallel after build image)
+  build-devdb-appserver-tools:
+    needs: create-devdb-build-manifest
+    strategy:
+      matrix:
+        image_type: [devdb-appserver, devdb-tools]
+        architecture: [arm64, amd64]
+    runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
+    steps:
+      - name: Determine dockerfile
+        id: dockerfile
+        run: |
+          if [ "${{ matrix.image_type }}" == "devdb-appserver" ]; then
+            echo "name=dockerfile.appserver" >> $GITHUB_OUTPUT
+          else
+            echo "name=dockerfile.tools" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build and push platform-devdb image
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: ${{ matrix.architecture }}
+          image_type: ${{ matrix.image_type }}
+          dockerfile: ${{ steps.dockerfile.outputs.name }}
+          docker_context: deployment
+          modules: ${{ inputs.modules }}
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  # Create multi-arch manifests for devdb-appserver and devdb-tools
+  create-devdb-manifests:
+    needs: build-devdb-appserver-tools
+    strategy:
+      matrix:
+        image_type: [devdb-appserver, devdb-tools]
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform-${{ matrix.image_type }}
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
+
+  # Wave 3: Build platform-devdb-qa-appserver (depends on devdb-appserver manifest)
+  build-devdb-qa-appserver:
+    needs: create-devdb-manifests
+    strategy:
+      matrix:
+        architecture: [arm64, amd64]
+    runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
+    steps:
+      - name: Build and push platform-devdb-qa-appserver image
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        with:
+          version: ${{ inputs.version }}
+          build_id: ${{ inputs.build_id }}
+          platform: ${{ matrix.architecture }}
+          image_type: devdb-qa-appserver
+          dockerfile: dockerfile.QAappserver
+          docker_context: deployment
+          modules: ${{ inputs.modules }}
+          acr: iqgeoproddev.azurecr.io
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          gh_token: ${{ secrets.GH_TOKEN }}
+
+  # Create multi-arch manifest for devdb-qa-appserver
+  create-devdb-qa-manifest:
+    needs: build-devdb-qa-appserver
+    runs-on: x64
+    steps:
+      - name: Create multi-arch manifest for platform-devdb-qa-appserver
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        with:
+          version: ${{ inputs.version }}
+          amd_tag: ${{ inputs.build_id }}_amd-64
+          arm_tag: ${{ inputs.build_id }}_arm-64
+          updated_tags: ${{ inputs.updated_tags }}
+          module: platform-devdb-qa-appserver
+          acr: iqgeoproddev.azurecr.io
+          harbor: harbor.delivery.iqgeo.cloud
+          registry_username: ${{ secrets.REGISTRY_USERNAME }}
+          registry_password: ${{ secrets.REGISTRY_PASSWORD }}
+          harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
+          harbor_username: ${{ secrets.HARBOR_USERNAME }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}
+          releases_prefix: ${{ inputs.releases_prefix }}
+          is_release: ${{ inputs.is_release }}
