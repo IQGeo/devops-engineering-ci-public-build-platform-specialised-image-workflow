@@ -126,7 +126,7 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
 
   # Create multi-arch manifests for devdb-appserver and devdb-tools
-  create-devdb-manifests:
+  create-devdb-appserver-tools-manifests:
     needs: build-devdb-appserver-tools
     strategy:
       matrix:
@@ -153,7 +153,7 @@ jobs:
 
   # Wave 3: Build platform-devdb-qa-appserver (depends on devdb-appserver manifest)
   build-devdb-qa-appserver:
-    needs: create-devdb-manifests
+    needs: create-devdb-appserver-tools-manifests
     strategy:
       matrix:
         architecture: [arm64, amd64]
@@ -176,7 +176,7 @@ jobs:
           gh_token: ${{ secrets.GH_TOKEN }}
 
   # Create multi-arch manifest for devdb-qa-appserver
-  create-devdb-qa-manifest:
+  create-devdb-qa-appserver-manifest:
     needs: build-devdb-qa-appserver
     runs-on: x64
     steps:
