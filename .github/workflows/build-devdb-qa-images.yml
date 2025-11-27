@@ -60,7 +60,7 @@ jobs:
           platform: ${{ matrix.architecture }}
           image_type: devdb-build
           dockerfile: dockerfile.build
-          docker_context: deployment
+          docker_context: deployment-devdb
           modules: ${{ inputs.modules }}
           acr: iqgeoproddev.azurecr.io
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -74,7 +74,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devdb-build
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
@@ -117,7 +117,7 @@ jobs:
           platform: ${{ matrix.architecture }}
           image_type: ${{ matrix.image_type }}
           dockerfile: ${{ steps.dockerfile.outputs.name }}
-          docker_context: deployment
+          docker_context: deployment-devdb
           modules: ${{ inputs.modules }}
           acr: iqgeoproddev.azurecr.io
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -134,7 +134,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
@@ -167,7 +167,7 @@ jobs:
           platform: ${{ matrix.architecture }}
           image_type: devdb-qa-appserver
           dockerfile: dockerfile.QAappserver
-          docker_context: deployment
+          docker_context: deployment-devdb
           modules: ${{ inputs.modules }}
           acr: iqgeoproddev.azurecr.io
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
@@ -181,7 +181,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devdb-qa-appserver
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
