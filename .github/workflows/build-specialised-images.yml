@@ -1,5 +1,5 @@
 name: Build Specialised Platform Images Workflow
-description: Workflow to build specialised platform images for a specific wave/dependency group
+description: Workflow to build specialised platform images using matrix strategy
 
 on:
   workflow_call:
@@ -8,8 +8,8 @@ on:
         description: 'Platform version to build (e.g., 7.4.0)'
         type: string
         required: true
-      wave:
-        description: 'Build wave number (1=base, 2=build, 3=appserver/tools, 4=devenv)'
+      image_types:
+        description: 'JSON array of image types to build (e.g., ["base", "base-clear"])'
         type: string
         required: true
       updated_tags:
@@ -45,43 +45,14 @@ on:
       HARBOR_USERNAME:
         required: true
 
-run-name: Build Platform ${{ inputs.version }} Wave ${{ inputs.wave }} Images
+run-name: Build Platform ${{ inputs.version }} Images
 
 jobs:
-  # Determine which images to build based on wave
-  setup:
-    runs-on: ubuntu-latest
-    outputs:
-      image_types: ${{ steps.set-images.outputs.types }}
-    steps:
-      - name: Set image types for wave
-        id: set-images
-        run: |
-          case "${{ inputs.wave }}" in
-            "1")
-              echo 'types=["base", "base-clear"]' >> $GITHUB_OUTPUT
-              ;;
-            "2")
-              echo 'types=["build", "build-clear"]' >> $GITHUB_OUTPUT
-              ;;
-            "3")
-              echo 'types=["appserver", "tools"]' >> $GITHUB_OUTPUT
-              ;;
-            "4")
-              echo 'types=["devenv", "devenv-clear"]' >> $GITHUB_OUTPUT
-              ;;
-            *)
-              echo "Unknown wave: ${{ inputs.wave }}"
-              exit 1
-              ;;
-          esac
-
-  # Build architecture-specific images
+  # Build architecture-specific images in parallel
   build-arch-images:
-    needs: [setup]
     strategy:
       matrix:
-        image_type: ${{ fromJson(needs.setup.outputs.image_types) }}
+        image_type: ${{ fromJson(inputs.image_types) }}
         architecture: [arm64, amd64]
     runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
     steps:
@@ -140,16 +111,16 @@ jobs:
           platform_base: ${{ steps.params.outputs.platform_base }}
           dev_tools_version: ${{ inputs.dev_tools_version }}
 
-  # Create multi-arch manifests for all images in this wave
+  # Create multi-arch manifests for all images
   create-multi-arch-manifests:
-    needs: [setup, build-arch-images]
+    needs: [build-arch-images]
     strategy:
       matrix:
-        image_type: ${{ fromJson(needs.setup.outputs.image_types) }}
+        image_type: ${{ fromJson(inputs.image_types) }}
     runs-on: x64
     steps:
       - name: Create multi-arch manifest
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/ET-734-platform-workflow
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
