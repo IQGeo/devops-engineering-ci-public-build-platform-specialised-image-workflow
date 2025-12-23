@@ -98,7 +98,7 @@ jobs:
             tools)
               echo "dockerfile=dockerfile.tools" >> $GITHUB_OUTPUT
               ;;
-            devenv|devenv-clear)
+            devenv-2|devenv-2-clear)
               echo "dockerfile=dockerfile.devenv" >> $GITHUB_OUTPUT
               ;;
           esac
@@ -111,7 +111,7 @@ jobs:
           fi
           
           # Determine platform_base value
-          if [[ "$IMAGE_TYPE" == "build-clear" ]] || [[ "$IMAGE_TYPE" == "devenv-clear" ]]; then
+          if [[ "$IMAGE_TYPE" == "build-clear" ]] || [[ "$IMAGE_TYPE" == "devenv-2-clear" ]]; then
             echo "platform_base=platform/platform-base-clear" >> $GITHUB_OUTPUT
           else
             echo "platform_base=platform/platform-base" >> $GITHUB_OUTPUT
