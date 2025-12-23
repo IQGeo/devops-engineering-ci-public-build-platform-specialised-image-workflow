@@ -48,8 +48,31 @@ on:
 run-name: Build Platform ${{ inputs.version }} Images
 
 jobs:
+  # Generate release_modules list by filtering out -clear images
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      release_modules: ${{ steps.filter.outputs.release_modules }}
+    steps:
+      - name: Filter release modules
+        id: filter
+        run: |
+          IMAGE_TYPES='${{ inputs.image_types }}'
+          
+          # Parse JSON array and filter out -clear images
+          RELEASE_MODULES=$(echo "$IMAGE_TYPES" | jq -r '.[] | select(contains("-clear") | not) | "platform/platform-" + .' | paste -sd ',' -)
+          
+          # If empty, set to "none" to prevent false positives in contains() checks
+          if [ -z "$RELEASE_MODULES" ]; then
+            RELEASE_MODULES="none"
+          fi
+          
+          echo "release_modules=$RELEASE_MODULES" >> $GITHUB_OUTPUT
+          echo "Release modules (excluding -clear images): $RELEASE_MODULES"
+
   # Build architecture-specific images in parallel
   build-arch-images:
+    needs: [setup]
     strategy:
       matrix:
         image_type: ${{ fromJson(inputs.image_types) }}
@@ -113,7 +136,7 @@ jobs:
 
   # Create multi-arch manifests for all images
   create-multi-arch-manifests:
-    needs: [build-arch-images]
+    needs: [setup, build-arch-images]
     strategy:
       matrix:
         image_type: ${{ fromJson(inputs.image_types) }}
@@ -127,6 +150,7 @@ jobs:
           arm_tag: ${{ inputs.build_id }}_arm-64
           updated_tags: ${{ inputs.updated_tags }}
           module: platform/platform-${{ matrix.image_type }}
+          release_modules: ${{ needs.setup.outputs.release_modules }}
           acr: iqgeoproddev.azurecr.io
           harbor: harbor.delivery.iqgeo.cloud
           registry_username: ${{ secrets.REGISTRY_USERNAME }}
