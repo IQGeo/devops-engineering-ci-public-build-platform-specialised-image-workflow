@@ -149,7 +149,7 @@ jobs:
           amd_tag: ${{ inputs.build_id }}_amd-64
           arm_tag: ${{ inputs.build_id }}_arm-64
           updated_tags: ${{ inputs.updated_tags }}
-          module: platform/platform-${{ matrix.image_type }}
+          module: platform-${{ matrix.image_type }}
           release_modules: ${{ needs.setup.outputs.release_modules }}
           acr: iqgeoproddev.azurecr.io
           harbor: harbor.delivery.iqgeo.cloud
@@ -157,6 +157,6 @@ jobs:
           registry_password: ${{ secrets.REGISTRY_PASSWORD }}
           harbor_cli_secret: ${{ secrets.HARBOR_CLI_SECRET }}
           harbor_username: ${{ secrets.HARBOR_USERNAME }}
-          engineering_prefix: ${{ inputs.engineering_prefix }}
+          engineering_prefix: ${{ inputs.engineering_prefix }}/platform
           releases_prefix: ${{ inputs.releases_prefix }}
           is_release: ${{ inputs.is_release }}
