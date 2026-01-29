@@ -15,6 +15,10 @@ on:
       updated_tags:
         description: 'Comma-separated list of tags to apply to multi-arch images (e.g., pre-release, latest)'
         type: string
+      shortened_version:
+        description: 'Shortened version for language packs repo'
+        required: true
+        type: string        
       build_id:
         description: 'Unique build ID per workflow run'
         type: string
@@ -118,7 +122,7 @@ jobs:
           fi
 
       - name: Build and push platform image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-823-add-language-pack-logic
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
@@ -133,6 +137,7 @@ jobs:
           obfuscate: ${{ steps.params.outputs.obfuscate }}
           platform_base: ${{ steps.params.outputs.platform_base }}
           dev_tools_version: ${{ inputs.dev_tools_version }}
+          shortened_version: ${{ inputs.shortened_version }}          
 
   # Create multi-arch manifests for all images
   create-multi-arch-manifests:
