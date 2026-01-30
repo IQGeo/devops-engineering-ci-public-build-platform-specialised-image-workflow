@@ -122,7 +122,7 @@ jobs:
           fi
 
       - name: Build and push platform image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-823-add-language-pack-logic
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
