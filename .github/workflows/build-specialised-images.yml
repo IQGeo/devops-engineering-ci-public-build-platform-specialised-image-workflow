@@ -131,7 +131,7 @@ jobs:
           fi
 
       - name: Build and push platform image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-859-platform-75-inputs
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
