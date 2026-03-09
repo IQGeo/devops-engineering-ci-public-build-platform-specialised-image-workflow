@@ -19,6 +19,15 @@ on:
         description: 'Shortened version for language packs repo'
         required: true
         type: string        
+      preqs_tag:
+        description: 'Tag for pre-reqs image'
+        required: true
+        type: string
+        default: '7'     
+      pip_flags:
+        description: 'pip install option flags'
+        required: false
+        type: string             
       build_id:
         description: 'Unique build ID per workflow run'
         type: string
@@ -137,7 +146,9 @@ jobs:
           obfuscate: ${{ steps.params.outputs.obfuscate }}
           platform_base: ${{ steps.params.outputs.platform_base }}
           dev_tools_version: ${{ inputs.dev_tools_version }}
-          shortened_version: ${{ inputs.shortened_version }}          
+          shortened_version: ${{ inputs.shortened_version }}    
+          preqs_tag: ${{ inputs.preqs_tag }}
+          pip_flags: ${{ inputs.pip_flags }}             
 
   # Create multi-arch manifests for all images
   create-multi-arch-manifests:
