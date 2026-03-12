@@ -21,7 +21,7 @@ on:
         type: string        
       preqs_tag:
         description: 'Tag for pre-reqs image'
-        required: true
+        required: false
         type: string
         default: '7'     
       pip_flags:
