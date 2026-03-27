@@ -74,7 +74,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devdb-build
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/et-874-jwt-testing
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
@@ -134,7 +134,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/et-874-jwt-testing
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
