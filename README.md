@@ -1,170 +1,90 @@
 # devops-engineering-ci-public-build-platform-specialised-image-workflow
 
-Reusable GitHub Actions workflow to build IQGeo Platform 7.x specialized images with multi-architecture support.
+Reusable GitHub Actions workflows for building the specialised IQGeo Platform image families.
 
 ## Overview
 
-This workflow builds 5 specialized platform images for both arm64 and amd64 architectures, creating multi-arch manifests for each. It implements a specific dependency chain to ensure images are built in the correct order.
+This repository contains the reusable workflows that build the main specialised platform images and the DevDB QA image chain. It sits between the top-level platform workflow and the low-level actions that perform architecture-specific builds and multi-arch manifest publication.
 
-## Workflow: `build-specialised-images.yml`
+For inbound and outbound dependency relationships, see [docs/WHO-CALLS-WHAT.md](docs/WHO-CALLS-WHAT.md).
 
-### Purpose
+## Workflows
 
-Builds specialized platform images that extend the base platform with specific capabilities:
+### `.github/workflows/build-specialised-images.yml`
 
-1. **platform-base** - Core platform with IQGeo files extracted
-2. **platform-build** - Build tools (Node.js, pip, Python build dependencies)
-3. **platform-appserver** - Application server (Apache, mod_wsgi)
-4. **platform-tools** - Additional tools (JDK)
-5. **platform-devenv** - Development environment (debugpy, playwright, dev tools)
+Builds a caller-supplied set of specialised platform image types.
 
-### Build Order & Dependencies
+Key responsibilities:
 
-The workflow enforces the following dependency chain:
+- Accepts a JSON array of `image_types`.
+- Builds amd64 and arm64 variants in parallel for each requested image type.
+- Uses `devops-engineering-ci-public-platform-build-push-action` for the architecture-specific image builds.
+- Uses `devops-engineering-ci-public-multi-arch-action` to publish and retag the manifest.
+- Filters `-clear` image variants out of release retagging.
 
-```
-platform-base (no dependencies)
-    ↓
-platform-build (depends on platform-base)
-    ↓
-    ├─→ platform-appserver (parallel)
-    └─→ platform-tools (parallel)
-        ↓
-    platform-devenv (depends on platform-appserver)
-```
+Current platform callers use it for these image groups:
 
-### Architecture
+- `base` and `base-clear`
+- `build` and `build-clear`
+- `appserver` and `tools`
+- `devenv-2` and `devenv-2-clear`
 
-For each image type, the workflow:
-1. Builds **arm64** version using `arm64` runner
-2. Builds **amd64** version using `x64` runner (in parallel with arm64)
-3. Creates **multi-arch manifest** combining both architectures
-4. Pushes to both Azure Container Registry (ACR) and Harbor
+### `.github/workflows/build-devdb-qa-images.yml`
 
-This results in **15 total jobs** (5 images × 3 steps each).
+Builds the DevDB QA image chain used for internal platform testing.
 
-## Usage
+Key responsibilities:
 
-This is a reusable workflow called by the main platform build workflow:
+- Builds `platform-devdb-build` first.
+- Builds `platform-devdb-appserver` and `platform-devdb-tools` after that.
+- Builds `platform-devdb-qa-appserver` as the final wave.
+- Creates a multi-arch manifest after each image wave.
 
-```yaml
-jobs:
-  build-specialised-platform-images:
-    uses: IQGeo/devops-engineering-ci-public-build-platform-specialised-image-workflow/.github/workflows/build-specialised-images.yml@main
-    with:
-      version: '7.4.0'
-      hyphenated_module: 'dev-db'
-      updated_tags: 'pre-release,latest'
-      build_id: 'unique-build-id-123'
-      is_release: 'false'
-      engineering_prefix: 'devops_sandbox_engineering'
-      releases_prefix: 'devops_sandbox_releases'
-      dev_tools_version: '7.4.0'
-    secrets: inherit
-```
+## Important inputs
 
-## Inputs
+For `build-specialised-images.yml`, the main inputs are:
 
-| Input | Description | Required | Default |
-|-------|-------------|----------|---------|
-| `version` | Platform version to build (e.g., 7.4.0) | Yes | - |
-| `hyphenated_module` | Hyphenated module name for image naming | Yes | - |
-| `updated_tags` | Comma-separated list of tags (e.g., pre-release, latest) | No | - |
-| `build_id` | Unique build ID per workflow run | Yes | - |
-| `engineering_prefix` | Engineering prefix for Harbor registry | No | `devops_sandbox_engineering` |
-| `releases_prefix` | Releases prefix for Harbor registry | No | `devops_sandbox_releases` |
-| `is_release` | Whether this is a pre-release or release version | No | - |
-| `dev_tools_version` | Dev tools version for devenv image | No | - |
+- `version`: platform version being built.
+- `image_types`: JSON array of requested image types.
+- `updated_tags`: extra tags to apply to the final manifest.
+- `shortened_version`: version shorthand for language pack lookup.
+- `build_id`: run-specific identifier for architecture-specific tags.
+- `engineering_prefix` and `releases_prefix`: target registry prefixes.
+- `is_release`: controls whether release repositories are retagged.
+- `dev_tools_version`, `preqs_tag`, and `pip_flags`: build arguments used by some image types.
 
-## Secrets
+For `build-devdb-qa-images.yml`, the main inputs are:
 
-| Secret | Description |
-|--------|-------------|
-| `GH_TOKEN` | GitHub token to clone utils-docker-platform repo |
-| `REGISTRY_USERNAME` | Azure Container Registry username |
-| `REGISTRY_PASSWORD` | Azure Container Registry password |
-| `HARBOR_CLI_SECRET` | Harbor registry password |
-| `HARBOR_USERNAME` | Harbor registry username |
+- `version`
+- `modules`
+- `updated_tags`
+- `build_id`
+- `engineering_prefix`
+- `releases_prefix`
+- `is_release`
 
-## Image Naming Convention
+## Build flow
 
-Images are tagged in ACR as:
-```
-iqgeoproddev.azurecr.io/{engineering_prefix}/platform/platform-{image_type}:{build_id}_{arch}
+Typical specialised image flow:
+
+```text
+build-specialised-images.yml
+  -> build-arch-images via platform-build-push-action
+  -> create-multi-arch-manifests via multi-arch-action
 ```
 
-Multi-arch manifests are created in Harbor as:
-```
-harbor.delivery.iqgeo.cloud/{engineering_prefix}/platform/platform-{image_type}:{version}
-harbor.delivery.iqgeo.cloud/{releases_prefix}/platform/platform-{image_type}:{version}  (if is_release)
-```
+Typical DevDB QA flow:
 
-Where:
-- `{image_type}` = base, build, appserver, tools, or devenv
-- `{arch}` = arm-64 or amd-64
-- `{version}` = Platform version (e.g., 7.4.0)
-
-## Dependencies
-
-This workflow uses:
-- **[devops-engineering-ci-public-platform-build-push-action](https://github.com/IQGeo/devops-engineering-ci-public-platform-build-push-action)** - Builds and pushes individual architecture images
-- **[devops-engineering-ci-public-multi-arch-action](https://github.com/IQGeo/devops-engineering-ci-public-multi-arch-action)** - Creates multi-arch manifests and pushes to registries
-- **[utils-docker-platform](https://github.com/IQGeo/utils-docker-platform)** - Contains the dockerfiles (platform/7x/)
-
-## Dockerfiles
-
-All dockerfiles are located in the `utils-docker-platform` repository under `platform/7x/`:
-
-- `dockerfile.base` - Base platform image
-- `dockerfile.build` - Build tools image
-- `dockerfile.appserver` - Application server image
-- `dockerfile.tools` - Tools image
-- `dockerfile.devenv` - Development environment image
-
-## Build Process
-
-Each architecture-specific build:
-1. Checks out `utils-docker-platform` repository
-2. Sets up Docker Buildx
-3. Logs in to Azure Container Registry
-4. Builds image with appropriate build arguments
-5. Pushes to ACR with architecture-specific tag
-
-Each multi-arch step:
-1. Pulls both arm64 and amd64 images from ACR
-2. Creates multi-arch manifest
-3. Pushes manifest to ACR
-4. Pushes manifest to Harbor (engineering and optionally releases prefix)
-5. Tags with version and optional additional tags
-
-## Example Output
-
-A successful run produces images like:
-```
-# ACR (architecture-specific)
-iqgeoproddev.azurecr.io/devops_sandbox_engineering/platform/platform-base:123_arm-64
-iqgeoproddev.azurecr.io/devops_sandbox_engineering/platform/platform-base:123_amd-64
-
-# Harbor (multi-arch manifests)
-harbor.delivery.iqgeo.cloud/devops_sandbox_engineering/platform/platform-base:7.4.0
-harbor.delivery.iqgeo.cloud/devops_sandbox_engineering/platform/platform-base:pre-release
-harbor.delivery.iqgeo.cloud/devops_sandbox_engineering/platform/platform-base:latest
+```text
+build-devdb-qa-images.yml
+  -> devdb-build
+  -> devdb-appserver and devdb-tools
+  -> devdb-qa-appserver
+  -> manifest publication after each wave
 ```
 
-## Troubleshooting
+## How this repo fits the wider build stack
 
-### Build Failures
-
-- **Check dependency order**: Ensure previous images completed successfully
-- **Verify build args**: Each image type requires specific build arguments
-- **Check registry credentials**: Ensure secrets are properly configured
-
-### Missing Images
-
-- **Check ACR**: Architecture-specific images should be in ACR first
-- **Check Harbor**: Multi-arch manifests are created after both architectures complete
-- **Verify prefixes**: Engineering vs releases prefix depends on `is_release` input
-
-## Related Workflows
-
-- **[devops-engineering-ci-public-build-platform-workflow](https://github.com/IQGeo/devops-engineering-ci-public-build-platform-workflow)** - Main platform build workflow that calls this workflow
+- Upstream: `devops-engineering-ci-public-build-platform-workflow` calls these workflows.
+- Downstream: the workflows rely on `devops-engineering-ci-public-platform-build-push-action` and `devops-engineering-ci-public-multi-arch-action`.
+- Scope: this repo owns specialised platform image orchestration, not top-level platform release logic.
