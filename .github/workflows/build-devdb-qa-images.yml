@@ -53,7 +53,7 @@ jobs:
     runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
     steps:
       - name: Build and push platform-devdb-build image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
@@ -74,7 +74,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devdb-build
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
@@ -110,7 +110,7 @@ jobs:
           fi
 
       - name: Build and push platform-devdb image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
@@ -134,7 +134,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
@@ -160,7 +160,7 @@ jobs:
     runs-on: ${{ matrix.architecture == 'arm64' && 'arm64' || 'x64' }}
     steps:
       - name: Build and push platform-devdb-qa-appserver image
-        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@main
+        uses: IQGeo/devops-engineering-ci-public-platform-build-push-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           build_id: ${{ inputs.build_id }}
@@ -181,7 +181,7 @@ jobs:
     runs-on: x64
     steps:
       - name: Create multi-arch manifest for platform-devdb-qa-appserver
-        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@main
+        uses: IQGeo/devops-engineering-ci-public-multi-arch-action@devops/et-979-add-sbom-attestation
         with:
           version: ${{ inputs.version }}
           amd_tag: ${{ inputs.build_id }}_amd-64
