@@ -197,3 +197,44 @@ jobs:
           engineering_prefix: ${{ inputs.engineering_prefix }}
           releases_prefix: ${{ inputs.releases_prefix }}
           is_release: ${{ inputs.is_release }}
+
+  # Retag all QA images from platform-* to iqgeo-* for ACR and Harbor
+  retag-as-iqgeo:
+    needs: create-devdb-qa-appserver-manifest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ACR
+        shell: bash
+        run: docker login -u ${{ secrets.REGISTRY_USERNAME }} -p ${{ secrets.REGISTRY_PASSWORD }} iqgeoproddev.azurecr.io
+
+      - name: Login to Harbor
+        shell: bash
+        continue-on-error: true
+        run: docker login -u ${{ secrets.HARBOR_USERNAME }} -p ${{ secrets.HARBOR_CLI_SECRET }} harbor.delivery.iqgeo.cloud
+
+      - name: Retag QA images as iqgeo-* in ACR and Harbor
+        shell: bash
+        run: |
+          IMAGES=(devdb-build devdb-appserver devdb-tools devdb-qa-appserver)
+          ALL_TAGS="$VERSION"
+          if [ -n "$UPDATED_TAGS" ]; then
+            ALL_TAGS="$VERSION,$UPDATED_TAGS"
+          fi
+          IFS=',' read -ra TAGS <<< "$ALL_TAGS"
+          for img in "${IMAGES[@]}"; do
+            for tag in "${TAGS[@]}"; do
+              SOURCE="$ACR/$ENGINEERING_PREFIX/platform-$img:$tag"
+              echo "Retagging $SOURCE -> iqgeo-$img:$tag"
+              docker buildx imagetools create --tag "$ACR/$ENGINEERING_PREFIX/iqgeo-$img:$tag" "$SOURCE"
+              docker buildx imagetools create --tag "$HARBOR/$ENGINEERING_PREFIX/iqgeo-$img:$tag" "$SOURCE" || true
+            done
+          done
+        env:
+          VERSION: ${{ inputs.version }}
+          UPDATED_TAGS: ${{ inputs.updated_tags }}
+          ACR: iqgeoproddev.azurecr.io
+          HARBOR: harbor.delivery.iqgeo.cloud
+          ENGINEERING_PREFIX: ${{ inputs.engineering_prefix }}
